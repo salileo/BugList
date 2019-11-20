@@ -58,12 +58,13 @@ namespace BugList
 
             List<Dev> devs = new List<Dev>();
             devs.Add(new Dev("Tim", "Tim McBride (ASP.NET)"));
-            devs.Add(new Dev("Eric", "Eric Wong"));
             devs.Add(new Dev("Guru", "Guru Kumaraguru"));
             devs.Add(new Dev("Lucas", "Lucas Stanford"));
-            devs.Add(new Dev("Jeong", "Jeong Woo Chang"));
-            devs.Add(new Dev("Yuwei", "Yuwei Wang"));
             devs.Add(new Dev("Petre", "Petre Munteanu"));
+            devs.Add(new Dev("Chris", "Christopher Scrosati"));
+            devs.Add(new Dev("Julian", "Julian Dominguez"));
+            devs.Add(new Dev("Rosy", "Rosy Chen"));
+            devs.Add(new Dev("Sammy", "Sammy Israwi"));
             //devs.Add(new Dev("Salil", "Salil Kapoor"));
 
             foreach (Dev dev in devs)
@@ -72,7 +73,7 @@ namespace BugList
                 {
                     FilePath = @"C:\Users\Salilk\Desktop",
                     Dev = dev,
-                    StartDate = new DateTime(2018, 7, 1),
+                    StartDate = new DateTime(2019, 5, 1),
                     LookForResolvedOnly = true
                 };
 
