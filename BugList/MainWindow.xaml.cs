@@ -146,6 +146,17 @@ namespace BugList
                                 assignedTo = workItem.Fields["Assigned To"].Value as string;
                             }
 
+                            string currentStatus = "";
+                            if (workItem.Fields.Contains("Status"))
+                            {
+                                currentStatus = workItem.Fields["Status"].Value as string;
+                            }
+                            string currentResolution = "";
+                            if (workItem.Fields.Contains("Resolution_Custom"))
+                            {
+                                currentResolution = workItem.Fields["Resolution_Custom"].Value as string;
+                            }
+
                             for (int j = workItem.Revisions.Count - 1; j >= 0; j--)
                             {
                                 if (worker.CancellationPending)
@@ -173,7 +184,7 @@ namespace BugList
                                                     state.OriginalValue != state.Value &&
                                                     (state.Value as string == "Done" || state.Value as string == "Removed"))
                                                 {
-                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
+                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags + ", " + "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
                                                     break;
                                                 }
                                                 else if (status != null &&
@@ -186,13 +197,13 @@ namespace BugList
                                                     status.Value as string != "In Review" &&
                                                     status.Value as string != "Forecasted")
                                                 {
-                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + "From status '" + status.OriginalValue as string + "' to '" + status.Value as string + "'");
+                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags + ", " + "From status '" + status.OriginalValue as string + "' to '" + status.Value as string + "'");
                                                     break;
                                                 }
                                                 else if (resolution != null &&
                                                     resolution.OriginalValue != resolution.Value)
                                                 {
-                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + "From resolution '" + resolution.OriginalValue as string + "' to '" + resolution.Value as string + "'");
+                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags + ", " + "From resolution '" + resolution.OriginalValue as string + "' to '" + resolution.Value as string + "'");
                                                     break;
                                                 } else
                                                 {
