@@ -65,7 +65,7 @@ namespace BugList
             devs.Add(new Dev("Julian", "Julian Dominguez"));
             devs.Add(new Dev("Rosy", "Rosy Chen"));
             devs.Add(new Dev("Sammy", "Sammy Israwi"));
-            //devs.Add(new Dev("Salil", "Salil Kapoor"));
+            devs.Add(new Dev("Salil", "Salil Kapoor"));
 
             foreach (Dev dev in devs)
             {
@@ -212,6 +212,7 @@ namespace BugList
                                             }
                                             else
                                             {
+                                                writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags);
                                                 break;
                                             }
                                         }
