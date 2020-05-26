@@ -212,7 +212,6 @@ namespace BugList
                                             }
                                             else
                                             {
-                                                writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State);
                                                 break;
                                             }
                                         }
@@ -244,7 +243,7 @@ namespace BugList
             string text = "";
             foreach (KeyValuePair<string, int> pair in vsoProgress)
             {
-                text += pair.Key + ":" + (pair.Value == 100 ? "Done" : pair.Value.ToString()) + "; ";
+                text += pair.Key + ":" + pair.Value.ToString() + "; ";
             }
 
             c_vso.Text = text;
@@ -253,6 +252,14 @@ namespace BugList
         private void VSOQuery_Completed(object sender, RunWorkerCompletedEventArgs e)
         {
             QueryData data = e.Result as QueryData;
+
+            string text = "";
+            foreach (KeyValuePair<string, int> pair in vsoProgress)
+            {
+                text += pair.Key + ":" + (pair.Key == data.Dev.Name ? "Done" : pair.Value.ToString()) + "; ";
+            }
+
+            c_vso.Text = text;
             this.WriteFiles(data);
         }
 
