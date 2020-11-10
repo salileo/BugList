@@ -59,13 +59,15 @@ namespace BugList
             List<Dev> devs = new List<Dev>();
             devs.Add(new Dev("Tim", "Tim McBride (ASP.NET)"));
             devs.Add(new Dev("Guru", "Guru Kumaraguru"));
-            devs.Add(new Dev("Lucas", "Lucas Stanford"));
             devs.Add(new Dev("Petre", "Petre Munteanu"));
+            devs.Add(new Dev("Jeremy", "Jeremy Hutchinson"));
+            devs.Add(new Dev("Saghan", "Saghan Mudbhari"));
             devs.Add(new Dev("Chris", "Christopher Scrosati"));
             devs.Add(new Dev("Julian", "Julian Dominguez"));
             devs.Add(new Dev("Rosy", "Rosy Chen"));
             devs.Add(new Dev("Sammy", "Sammy Israwi"));
-            devs.Add(new Dev("Salil", "Salil Kapoor"));
+            devs.Add(new Dev("Nicole", "Nicole Weese"));
+            //devs.Add(new Dev("Salil", "Salil Kapoor"));
 
             foreach (Dev dev in devs)
             {
@@ -73,7 +75,7 @@ namespace BugList
                 {
                     FilePath = @"C:\Users\Salilk\Desktop",
                     Dev = dev,
-                    StartDate = new DateTime(2019, 5, 1),
+                    StartDate = new DateTime(2020, 6, 1),
                     LookForResolvedOnly = true
                 };
 
@@ -124,6 +126,7 @@ namespace BugList
 
                     using (StreamWriter writer = new StreamWriter(stream))
                     {
+                        writer.WriteLine("URL,Assigned To,Title,Changed Date,State,Status,Resolution,Tags,Change");
                         for (int i = workItems.Count - 1; i >= 0; i--)
                         {
                             if (worker.CancellationPending)
@@ -184,7 +187,7 @@ namespace BugList
                                                     state.OriginalValue != state.Value &&
                                                     (state.Value as string == "Done" || state.Value as string == "Removed"))
                                                 {
-                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags + ", " + "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
+                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
                                                     break;
                                                 }
                                                 else if (status != null &&
@@ -197,22 +200,23 @@ namespace BugList
                                                     status.Value as string != "In Review" &&
                                                     status.Value as string != "Forecasted")
                                                 {
-                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags + ", " + "From status '" + status.OriginalValue as string + "' to '" + status.Value as string + "'");
+                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "From status '" + status.OriginalValue as string + "' to '" + status.Value as string + "'");
                                                     break;
                                                 }
                                                 else if (resolution != null &&
                                                     resolution.OriginalValue != resolution.Value)
                                                 {
-                                                    writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags + ", " + "From resolution '" + resolution.OriginalValue as string + "' to '" + resolution.Value as string + "'");
+                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "From resolution '" + resolution.OriginalValue as string + "' to '" + resolution.Value as string + "'");
                                                     break;
-                                                } else
+                                                }
+                                                else
                                                 {
 
                                                 }
                                             }
                                             else
                                             {
-                                                writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + ", " + assignedTo + ", " + workItem.Title.Replace(',', ';') + ", " + changedDate.ToString() + ", " + workItem.State + ", " + currentStatus + ", " + currentResolution + ", " + workItem.Tags);
+                                                this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "");
                                                 break;
                                             }
                                         }
@@ -234,6 +238,11 @@ namespace BugList
                 data.VSOTaskDone = true;
                 workArgs.Result = data;
             }
+        }
+
+        private void WriteLine(StreamWriter writer, Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItem workItem, string assignedTo, DateTime changedDate, string currentStatus, string currentResolution, string message)
+        {
+            writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + "," + assignedTo + "," + workItem.Title.Replace(',', ';') + "," + changedDate.ToString() + "," + workItem.State + "," + currentStatus + "," + currentResolution + "," + workItem.Tags + "," + message);
         }
 
         Dictionary<string, int> vsoProgress = new Dictionary<string, int>();
