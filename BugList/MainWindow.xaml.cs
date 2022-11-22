@@ -57,23 +57,25 @@ namespace BugList
             InitializeComponent();
 
             List<Dev> devs = new List<Dev>();
-            devs.Add(new Dev("Tim", "Tim McBride (ASP.NET)"));
-            devs.Add(new Dev("Guru", "Guru Kumaraguru"));
-            devs.Add(new Dev("Petre", "Petre Munteanu"));
-            devs.Add(new Dev("Jeremy", "Jeremy Hutchinson"));
-            devs.Add(new Dev("Saghan", "Saghan Mudbhari"));
-            devs.Add(new Dev("Chris", "Christopher Scrosati"));
-            devs.Add(new Dev("Julian", "Julian Dominguez"));
-            devs.Add(new Dev("Rosy", "Rosy Chen"));
-            devs.Add(new Dev("Sammy", "Sammy Israwi"));
-            devs.Add(new Dev("Nicole", "Nicole Weese"));
+            devs.Add(new Dev("Ankush", "Ankush Sharma"));
+            devs.Add(new Dev("Ashish", "Ashish Mittal"));
+            devs.Add(new Dev("CanHua", "CanHua Li"));
+            devs.Add(new Dev("Dhanaraj", "Dhanaraj Durairaj"));
+            devs.Add(new Dev("Gitansh", "Gitansh Garg"));
+            devs.Add(new Dev("Harmanpreet", "Harmanpreet Singh"));
+            devs.Add(new Dev("Kaustubh", "Kaustubh Choudhary"));
+            devs.Add(new Dev("Muralimanohar", "Muralimanohar P"));
+            devs.Add(new Dev("Nitya", "Nitya Sandadi"));
+            devs.Add(new Dev("Ram", "Ram Narendar"));
+            devs.Add(new Dev("Shae", "Shae Hurst"));
+            devs.Add(new Dev("Vignesh", "Vignesh Sridhar"));
             //devs.Add(new Dev("Salil", "Salil Kapoor"));
 
             foreach (Dev dev in devs)
             {
                 QueryData data = new QueryData()
                 {
-                    FilePath = @"C:\Users\Salilk\Desktop",
+                    FilePath = @"D:\OneDrive\Salil Documents\Desktop",
                     Dev = dev,
                     StartDate = new DateTime(2020, 6, 1),
                     LookForResolvedOnly = true
@@ -103,7 +105,7 @@ namespace BugList
             {
                 using (MemoryStream stream = new MemoryStream())
                 {
-                    TfsTeamProjectCollection projects = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(new Uri("https://msazure.visualstudio.com"));
+                    TfsTeamProjectCollection projects = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(new Uri("https://o365exchange.visualstudio.com"));
                     if (worker.CancellationPending)
                     {
                         workArgs.Cancel = true;
@@ -126,7 +128,7 @@ namespace BugList
 
                     using (StreamWriter writer = new StreamWriter(stream))
                     {
-                        writer.WriteLine("URL,Assigned To,Title,Changed Date,State,Status,Resolution,Tags,Change");
+                        writer.WriteLine("URL,Assigned To,Title,Changed Date,State,Reason,Tags,Change");
                         for (int i = workItems.Count - 1; i >= 0; i--)
                         {
                             if (worker.CancellationPending)
@@ -149,15 +151,10 @@ namespace BugList
                                 assignedTo = workItem.Fields["Assigned To"].Value as string;
                             }
 
-                            string currentStatus = "";
-                            if (workItem.Fields.Contains("Status"))
+                            string currentReason = "";
+                            if (workItem.Fields.Contains("Reason"))
                             {
-                                currentStatus = workItem.Fields["Status"].Value as string;
-                            }
-                            string currentResolution = "";
-                            if (workItem.Fields.Contains("Resolution_Custom"))
-                            {
-                                currentResolution = workItem.Fields["Resolution_Custom"].Value as string;
+                                currentReason = workItem.Fields["Reason"].Value as string;
                             }
 
                             for (int j = workItem.Revisions.Count - 1; j >= 0; j--)
@@ -180,33 +177,19 @@ namespace BugList
                                             if (data.LookForResolvedOnly)
                                             {
                                                 Field state = revision.Fields.Contains("State") ? revision.Fields["State"] : null;
-                                                Field status = revision.Fields.Contains("Status") ? revision.Fields["Status"] : null;
-                                                Field resolution = revision.Fields.Contains("Resolution_Custom") ? revision.Fields["Resolution_Custom"] : null;
+                                                Field reason = revision.Fields.Contains("Reason") ? revision.Fields["Reason"] : null;
 
                                                 if (state != null &&
                                                     state.OriginalValue != state.Value &&
-                                                    (state.Value as string == "Done" || state.Value as string == "Removed"))
+                                                    (state.Value as string == "Completed" || state.Value as string == "Closed" || state.Value as string == "Removed" || state.Value as string == "Resolved" || state.Value as string == "Merged to Prod"))
                                                 {
-                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
+                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentReason, "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
                                                     break;
                                                 }
-                                                else if (status != null &&
-                                                    status.OriginalValue != status.Value &&
-                                                    status.Value as string != "" &&
-                                                    status.Value as string != "New" &&
-                                                    status.Value as string != "Blocked" &&
-                                                    status.Value as string != "Delayed" &&
-                                                    status.Value as string != "In Progress" &&
-                                                    status.Value as string != "In Review" &&
-                                                    status.Value as string != "Forecasted")
+                                                else if (reason != null &&
+                                                    reason.OriginalValue != reason.Value)
                                                 {
-                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "From status '" + status.OriginalValue as string + "' to '" + status.Value as string + "'");
-                                                    break;
-                                                }
-                                                else if (resolution != null &&
-                                                    resolution.OriginalValue != resolution.Value)
-                                                {
-                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "From resolution '" + resolution.OriginalValue as string + "' to '" + resolution.Value as string + "'");
+                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentReason, "From reason '" + reason.OriginalValue as string + "' to '" + reason.Value as string + "'");
                                                     break;
                                                 }
                                                 else
@@ -216,7 +199,7 @@ namespace BugList
                                             }
                                             else
                                             {
-                                                this.WriteLine(writer, workItem, assignedTo, changedDate, currentStatus, currentResolution, "");
+                                                this.WriteLine(writer, workItem, assignedTo, changedDate, currentReason, "");
                                                 break;
                                             }
                                         }
@@ -240,9 +223,9 @@ namespace BugList
             }
         }
 
-        private void WriteLine(StreamWriter writer, Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItem workItem, string assignedTo, DateTime changedDate, string currentStatus, string currentResolution, string message)
+        private void WriteLine(StreamWriter writer, Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItem workItem, string assignedTo, DateTime changedDate, string currentReason, string message)
         {
-            writer.WriteLine("https://msazure.visualstudio.com/One/_workitems/edit/" + workItem.Id.ToString() + "," + assignedTo + "," + workItem.Title.Replace(',', ';') + "," + changedDate.ToString() + "," + workItem.State + "," + currentStatus + "," + currentResolution + "," + workItem.Tags + "," + message);
+            writer.WriteLine("https://o365exchange.visualstudio.com/Viva%20Ally/_workitems/edit/" + workItem.Id.ToString() + "," + assignedTo + "," + workItem.Title.Replace(',', ';') + "," + changedDate.ToString() + "," + workItem.State + "," + currentReason + "," + workItem.Tags + "," + message);
         }
 
         Dictionary<string, int> vsoProgress = new Dictionary<string, int>();
@@ -253,7 +236,7 @@ namespace BugList
             string text = "";
             foreach (KeyValuePair<string, int> pair in vsoProgress)
             {
-                text += pair.Key + ":" + pair.Value.ToString() + "; ";
+                text += pair.Key + ":" + (pair.Value == -1 ? "Done" : pair.Value.ToString()) + "; ";
             }
 
             c_vso.Text = text;
@@ -262,11 +245,12 @@ namespace BugList
         private void VSOQuery_Completed(object sender, RunWorkerCompletedEventArgs e)
         {
             QueryData data = e.Result as QueryData;
+            vsoProgress[data.Dev.Name] = -1;
 
             string text = "";
             foreach (KeyValuePair<string, int> pair in vsoProgress)
             {
-                text += pair.Key + ":" + (pair.Key == data.Dev.Name ? "Done" : pair.Value.ToString()) + "; ";
+                text += pair.Key + ":" + (pair.Value == -1 ? "Done" : pair.Value.ToString()) + "; ";
             }
 
             c_vso.Text = text;
