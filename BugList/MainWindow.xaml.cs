@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -10,18 +12,20 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using Microsoft.TeamFoundation.Client;
-using Microsoft.TeamFoundation.SourceControl.WebApi;
-using Microsoft.TeamFoundation.WorkItemTracking.Client;
+using Microsoft.Azure.Amqp.Framing;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.TeamFoundation.Work.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
-using Microsoft.VisualStudio.Services.Client;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
+using Newtonsoft.Json.Linq;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace BugList
 {
@@ -42,199 +46,134 @@ namespace BugList
             }
         }
 
-        private class QueryData
-        {
-            public string FilePath { get; set; }
-            public Dev Dev { get; set; }
-            public DateTime StartDate { get; set; }
-            public bool LookForResolvedOnly { get; set; }
-            public byte[] VSOData { get; set; }
-            public bool VSOTaskDone { get; set; }
-        };
-
         public MainWindow()
         {
             InitializeComponent();
 
             List<Dev> devs = new List<Dev>();
-            devs.Add(new Dev("Ankush", "Ankush Sharma"));
-            devs.Add(new Dev("Ashish", "Ashish Mittal"));
-            devs.Add(new Dev("CanHua", "CanHua Li"));
-            devs.Add(new Dev("Dhanaraj", "Dhanaraj Durairaj"));
-            devs.Add(new Dev("Gitansh", "Gitansh Garg"));
-            devs.Add(new Dev("Harmanpreet", "Harmanpreet Singh"));
-            devs.Add(new Dev("Kaustubh", "Kaustubh Choudhary"));
-            devs.Add(new Dev("Muralimanohar", "Muralimanohar P"));
+            devs.Add(new Dev("Debashis", "Debashis Mondal"));
             devs.Add(new Dev("Nitya", "Nitya Sandadi"));
-            devs.Add(new Dev("Ram", "Ram Narendar"));
             devs.Add(new Dev("Shae", "Shae Hurst"));
-            devs.Add(new Dev("Vignesh", "Vignesh Sridhar"));
+            devs.Add(new Dev("Krishna", "Govinda Krishnamurthy Kandipilli"));
+            devs.Add(new Dev("CanHua", "CanHua Li"));
+            devs.Add(new Dev("Kannan", "Kannan Bhoopathy"));
+            //devs.Add(new Dev("Ankush", "Ankush Jain 🐎"));
+            //devs.Add(new Dev("Sandeep", "Sandeep Prusty"));
             //devs.Add(new Dev("Salil", "Salil Kapoor"));
 
             foreach (Dev dev in devs)
             {
-                QueryData data = new QueryData()
-                {
-                    FilePath = @"D:\OneDrive\Salil Documents\Desktop",
-                    Dev = dev,
-                    StartDate = new DateTime(2020, 6, 1),
-                    LookForResolvedOnly = true
-                };
-
-                BackgroundWorker vsoTask = new BackgroundWorker();
-                vsoTask.WorkerReportsProgress = true;
-                vsoTask.WorkerSupportsCancellation = true;
-                vsoTask.DoWork += new DoWorkEventHandler(VSOQuery);
-                vsoTask.ProgressChanged += new ProgressChangedEventHandler(VSOQuery_Progress);
-                vsoTask.RunWorkerCompleted += new RunWorkerCompletedEventHandler(VSOQuery_Completed);
-                vsoTask.RunWorkerAsync(data);
+                VSOQuery(dev, new DateTime(2023, 6, 1), true);
             }
         }
 
-        private void VSOQuery(object sender, DoWorkEventArgs workArgs)
+        private async void VSOQuery(Dev dev, DateTime startDate, bool lookForResolvedOnly)
         {
-            BackgroundWorker worker = sender as BackgroundWorker;
-            QueryData data = workArgs.Argument as QueryData;
-            string vsoQuery = string.Format(@"
-                select *
-                from WorkItems
-                where [System.ChangedBy] ever '{0}'
-                and [System.ChangedDate] > '{1}'", data.Dev.NameInVSO, data.StartDate.ToShortDateString());
+            UpdateProgress(dev.Name, 0);
+            var credentials = new VssBasicCredential(string.Empty, "imquwy4iuwi54e4dspecrnvkhxdba3x64gsr4wr5djkgquapvsiq");
 
-            try
+            // create a wiql object and build our query
+            var wiql = new Wiql()
             {
-                using (MemoryStream stream = new MemoryStream())
+                // NOTE: Even if other columns are specified, only the ID & URL are available in the WorkItemReference
+                Query = "Select * " +
+                        "From WorkItems " +
+                        "Where [System.ChangedBy] Ever '" + dev.NameInVSO + "' " +
+                        "And [System.ChangedDate] > '" + startDate.ToShortDateString() + "' "
+            };
+
+            // create instance of work item tracking http client
+            using (var httpClient = new WorkItemTrackingHttpClient(new Uri("https://o365exchange.visualstudio.com"), credentials))
+            {
+                // execute the query to get the list of work items in the results
+                var result = await httpClient.QueryByWiqlAsync(wiql);
+
+                var ids = result.WorkItems.Select(item => item.Id).ToList();
+                if (ids.Count == 0)
                 {
-                    TfsTeamProjectCollection projects = TfsTeamProjectCollectionFactory.GetTeamProjectCollection(new Uri("https://o365exchange.visualstudio.com"));
-                    if (worker.CancellationPending)
-                    {
-                        workArgs.Cancel = true;
-                        return;
-                    }
+                    //error
+                }
 
-                    WorkItemStore workItemStore = projects.GetService<WorkItemStore>();
-                    if (worker.CancellationPending)
-                    {
-                        workArgs.Cancel = true;
-                        return;
-                    }
+                int batchSize = 200;
+                List<WorkItem> workItems = new List<WorkItem>();
+                for (var i = 0; i < (float)ids.Count / batchSize; i++)
+                {
+                    var partIds = ids.Skip(i * batchSize).Take(batchSize);
 
-                    WorkItemCollection workItems = workItemStore.Query(vsoQuery);
-                    if (worker.CancellationPending)
-                    {
-                        workArgs.Cancel = true;
-                        return;
-                    }
+                    // build a list of the fields we want to see
+                    //var fields = new[] { "System.Id", "System.Title", "System.State" };
 
-                    using (StreamWriter writer = new StreamWriter(stream))
+                    // get work items for the ids found in query
+                    var partWorkItems = await httpClient.GetWorkItemsAsync(partIds, null, result.AsOf);
+                    workItems.AddRange(partWorkItems);
+                }
+
+                using (MemoryStream stream = new MemoryStream())
+                using (StreamWriter writer = new StreamWriter(stream))
+                {
+                    writer.WriteLine("URL,Assigned To,Title,Changed Date,State,Reason,Tags,Change");
+                    for (int i = workItems.Count - 1; i >= 0; i--)
                     {
-                        writer.WriteLine("URL,Assigned To,Title,Changed Date,State,Reason,Tags,Change");
-                        for (int i = workItems.Count - 1; i >= 0; i--)
+                        UpdateProgress(dev.Name, (int)(((workItems.Count - i) * 100.00) / workItems.Count));
+
+                        WorkItem workItem = workItems[i];
+                        var revisions = await httpClient.GetRevisionsAsync((int)workItem.Id);
+
+                        for (int j = revisions.Count - 1; j >= 0; j--)
                         {
-                            if (worker.CancellationPending)
+                            WorkItem revision = revisions[j];
+                            DateTime changedDate = (DateTime)revision.Fields["System.ChangedDate"];
+                            if (changedDate > startDate)
                             {
-                                workArgs.Cancel = true;
-                                return;
-                            }
-
-                            worker.ReportProgress((int)(((workItems.Count - i) * 100.00) / workItems.Count), data.Dev.Name);
-
-                            Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItem workItem = workItems[i];
-                            if (workItem.Revisions == null)
-                            {
-                                continue;
-                            }
-
-                            string assignedTo = "";
-                            if (workItem.Fields.Contains("Assigned To"))
-                            {
-                                assignedTo = workItem.Fields["Assigned To"].Value as string;
-                            }
-
-                            string currentReason = "";
-                            if (workItem.Fields.Contains("Reason"))
-                            {
-                                currentReason = workItem.Fields["Reason"].Value as string;
-                            }
-
-                            for (int j = workItem.Revisions.Count - 1; j >= 0; j--)
-                            {
-                                if (worker.CancellationPending)
+                                string changedBy = (revision.Fields["System.ChangedBy"] as IdentityRef).DisplayName;
+                                if (changedBy.Contains(dev.NameInVSO))
                                 {
-                                    workArgs.Cancel = true;
-                                    return;
-                                }
-
-                                Revision revision = workItem.Revisions[j];
-                                if (revision.Fields.Contains("Changed By") && revision.Fields.Contains("Changed Date"))
-                                {
-                                    DateTime changedDate = (DateTime)revision.Fields["Changed Date"].Value;
-                                    if (changedDate > data.StartDate)
+                                    if (lookForResolvedOnly)
                                     {
-                                        string changedBy = revision.Fields["Changed By"].Value as string;
-                                        if (changedBy.Contains(data.Dev.NameInVSO))
+                                        var thisState = (string)revision.Fields["System.State"];
+                                        var thisReason = (string)revision.Fields["System.Reason"];
+                                        var nextState = j > 0 ? (string)revisions[j - 1].Fields["System.State"] : "";
+                                        var nextReason = j > 0 ? (string)revisions[j - 1].Fields["System.Reason"] : "";
+
+                                        if ((thisState != nextState) && (thisState == "Completed" || thisState == "Closed" || thisState == "Removed" || thisState == "Resolved"))
                                         {
-                                            if (data.LookForResolvedOnly)
-                                            {
-                                                Field state = revision.Fields.Contains("State") ? revision.Fields["State"] : null;
-                                                Field reason = revision.Fields.Contains("Reason") ? revision.Fields["Reason"] : null;
 
-                                                if (state != null &&
-                                                    state.OriginalValue != state.Value &&
-                                                    (state.Value as string == "Completed" || state.Value as string == "Closed" || state.Value as string == "Removed" || state.Value as string == "Resolved" || state.Value as string == "Merged to Prod"))
-                                                {
-                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentReason, "From state '" + state.OriginalValue as string + "' to '" + state.Value as string + "'");
-                                                    break;
-                                                }
-                                                else if (reason != null &&
-                                                    reason.OriginalValue != reason.Value)
-                                                {
-                                                    this.WriteLine(writer, workItem, assignedTo, changedDate, currentReason, "From reason '" + reason.OriginalValue as string + "' to '" + reason.Value as string + "'");
-                                                    break;
-                                                }
-                                                else
-                                                {
-
-                                                }
-                                            }
-                                            else
-                                            {
-                                                this.WriteLine(writer, workItem, assignedTo, changedDate, currentReason, "");
-                                                break;
-                                            }
+                                            this.WriteLine(writer, workItem, changedDate, "From state '" + nextState + "' to '" + thisState + "'");
+                                            break;
+                                        }
+                                        else if (thisReason != nextReason)
+                                        {
+                                            this.WriteLine(writer, workItem, changedDate, "From reason '" + nextReason + "' to '" + thisReason + "'");
+                                            break;
                                         }
                                     }
                                     else
                                     {
+                                        this.WriteLine(writer, workItem, changedDate, "");
                                         break;
                                     }
                                 }
                             }
+                            else
+                            {
+                                break;
+                            }
                         }
                     }
 
-                    data.VSOData = stream.ToArray();
+                    WriteFiles(dev, stream.ToArray());
+                    UpdateProgress(dev.Name, -1);
                 }
             }
-            finally
-            {
-                data.VSOTaskDone = true;
-                workArgs.Result = data;
-            }
         }
 
-        private void WriteLine(StreamWriter writer, Microsoft.TeamFoundation.WorkItemTracking.Client.WorkItem workItem, string assignedTo, DateTime changedDate, string currentReason, string message)
+        private IDictionary<string, int> devProgress = new Dictionary<string, int>();
+        private void UpdateProgress(string dev, int progress)
         {
-            writer.WriteLine("https://o365exchange.visualstudio.com/Viva%20Ally/_workitems/edit/" + workItem.Id.ToString() + "," + assignedTo + "," + workItem.Title.Replace(',', ';') + "," + changedDate.ToString() + "," + workItem.State + "," + currentReason + "," + workItem.Tags + "," + message);
-        }
-
-        Dictionary<string, int> vsoProgress = new Dictionary<string, int>();
-        private void VSOQuery_Progress(object sender, ProgressChangedEventArgs e)
-        {
-            vsoProgress[e.UserState as string] = e.ProgressPercentage;
+            devProgress[dev] = progress;
 
             string text = "";
-            foreach (KeyValuePair<string, int> pair in vsoProgress)
+            foreach (KeyValuePair<string, int> pair in devProgress)
             {
                 text += pair.Key + ":" + (pair.Value == -1 ? "Done" : pair.Value.ToString()) + "; ";
             }
@@ -242,32 +181,22 @@ namespace BugList
             c_vso.Text = text;
         }
 
-        private void VSOQuery_Completed(object sender, RunWorkerCompletedEventArgs e)
+        private void WriteLine(StreamWriter writer, WorkItem workItem, DateTime changedDate, string message)
         {
-            QueryData data = e.Result as QueryData;
-            vsoProgress[data.Dev.Name] = -1;
+            string assignedTo = workItem.Fields.ContainsKey("System.AssignedTo") ? (workItem.Fields["System.AssignedTo"] as IdentityRef).DisplayName : "";
+            string title = (string)workItem.Fields["System.Title"];
+            string state = (string)workItem.Fields["System.State"];
+            string reason = (string)workItem.Fields["System.Reason"];
+            string tags = "";
 
-            string text = "";
-            foreach (KeyValuePair<string, int> pair in vsoProgress)
-            {
-                text += pair.Key + ":" + (pair.Value == -1 ? "Done" : pair.Value.ToString()) + "; ";
-            }
-
-            c_vso.Text = text;
-            this.WriteFiles(data);
+            writer.WriteLine("https://o365exchange.visualstudio.com/Viva%20Ally/_workitems/edit/" + workItem.Id.ToString() + "," + assignedTo + "," + title.Replace(',', ';') + "," + changedDate.ToString() + "," + state + "," + reason + "," + tags + "," + message);
         }
 
-        private void WriteFiles(QueryData data)
+        private void WriteFiles(Dev dev, byte[] data)
         {
-            if (!data.VSOTaskDone)
+            using (FileStream file = File.Create(System.IO.Path.Combine(@"D:\OneDrive\Salil Documents\Desktop", dev.Name + ".csv")))
             {
-                return;
-            }
-
-            using (FileStream file = File.Create(System.IO.Path.Combine(data.FilePath, data.Dev.Name + ".csv")))
-            {
-                if (data.VSOData != null)
-                    file.Write(data.VSOData, 0, data.VSOData.Length);
+                file.Write(data, 0, data.Length);
             }
         }
     }
