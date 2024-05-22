@@ -70,7 +70,7 @@ namespace BugList
         private async void VSOQuery(Dev dev, DateTime startDate, bool lookForResolvedOnly)
         {
             UpdateProgress(dev.Name, 0);
-            var credentials = new VssBasicCredential(string.Empty, "imquwy4iuwi54e4dspecrnvkhxdba3x64gsr4wr5djkgquapvsiq");
+            var credentials = new VssBasicCredential(string.Empty, "");
 
             // create a wiql object and build our query
             var wiql = new Wiql()
